@@ -8,12 +8,18 @@ const DB_PORT = Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306);
 const DB_USER = process.env.DB_USER || process.env.MYSQLUSER || 'root';
 const DB_PASSWORD = process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : (process.env.MYSQLPASSWORD || '');
 const DB_NAME = process.env.DB_NAME || process.env.MYSQLDATABASE || 'store_rating_db';
-const DB_SSL = process.env.DB_SSL === 'true' || (connectionUri && connectionUri.includes('ssl='));
+
+const isCloudHost = (host) => host && (host.includes('aivencloud.com') || host.includes('tidbcloud.com') || host.includes('railway'));
+const isCloudUri = connectionUri && (connectionUri.includes('aivencloud') || connectionUri.includes('tidbcloud') || connectionUri.includes('ssl') || connectionUri.includes('railway'));
+
+const DB_SSL = process.env.DB_SSL === 'true' || isCloudHost(DB_HOST) || isCloudUri;
 
 const getPoolConfig = () => {
   if (connectionUri) {
+    // Strip ssl-mode parameter if present to prevent mysql2 warning
+    const cleanedUri = connectionUri.replace(/([?&])ssl-mode=[^&]+(&|$)/, '$1').replace(/[?&]$/, '');
     return {
-      uri: connectionUri,
+      uri: cleanedUri,
       waitForConnections: true,
       connectionLimit: 10,
       queueLimit: 0,

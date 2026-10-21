@@ -1,42 +1,65 @@
 const mysql = require('mysql2/promise');
 require('dotenv').config();
 
-const {
-  DB_HOST = 'localhost',
-  DB_PORT = 3306,
-  DB_USER = 'root',
-  DB_PASSWORD = '',
-  DB_NAME = 'store_rating_db'
-} = process.env;
+const connectionUri = process.env.DATABASE_URL || process.env.MYSQL_URL;
+
+const DB_HOST = process.env.DB_HOST || process.env.MYSQLHOST || 'localhost';
+const DB_PORT = Number(process.env.DB_PORT || process.env.MYSQLPORT || 3306);
+const DB_USER = process.env.DB_USER || process.env.MYSQLUSER || 'root';
+const DB_PASSWORD = process.env.DB_PASSWORD !== undefined ? process.env.DB_PASSWORD : (process.env.MYSQLPASSWORD || '');
+const DB_NAME = process.env.DB_NAME || process.env.MYSQLDATABASE || 'store_rating_db';
+const DB_SSL = process.env.DB_SSL === 'true' || (connectionUri && connectionUri.includes('ssl='));
+
+const getPoolConfig = () => {
+  if (connectionUri) {
+    return {
+      uri: connectionUri,
+      waitForConnections: true,
+      connectionLimit: 10,
+      queueLimit: 0,
+      ...(DB_SSL ? { ssl: { rejectUnauthorized: false } } : {})
+    };
+  }
+  return {
+    host: DB_HOST,
+    port: DB_PORT,
+    user: DB_USER,
+    password: DB_PASSWORD,
+    database: DB_NAME,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    ...(DB_SSL ? { ssl: { rejectUnauthorized: false } } : {})
+  };
+};
 
 let pool = null;
 
 const initDatabase = async () => {
   try {
-    // 1. Initial connection without database to ensure DB exists
-    const rootConnection = await mysql.createConnection({
-      host: DB_HOST,
-      port: Number(DB_PORT),
-      user: DB_USER,
-      password: DB_PASSWORD
-    });
+    // If not using a fixed connection URI, ensure database exists
+    if (!connectionUri) {
+      try {
+        const rootConnection = await mysql.createConnection({
+          host: DB_HOST,
+          port: DB_PORT,
+          user: DB_USER,
+          password: DB_PASSWORD,
+          ...(DB_SSL ? { ssl: { rejectUnauthorized: false } } : {})
+        });
 
-    await rootConnection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;`);
-    await rootConnection.end();
+        await rootConnection.query(`CREATE DATABASE IF NOT EXISTS \`${DB_NAME}\`;`);
+        await rootConnection.end();
+      } catch (dbCreateErr) {
+        // In managed cloud DBs, CREATE DATABASE might be restricted if the database is already allocated
+        console.warn('Notice: Skipping database creation check (may be managed cloud instance):', dbCreateErr.message);
+      }
+    }
 
-    // 2. Create the pooled connection with selected database
-    pool = mysql.createPool({
-      host: DB_HOST,
-      port: Number(DB_PORT),
-      user: DB_USER,
-      password: DB_PASSWORD,
-      database: DB_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0
-    });
+    // Create the pooled connection
+    pool = mysql.createPool(getPoolConfig());
 
-    // 3. Create Users table
+    // Create Users table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -50,7 +73,7 @@ const initDatabase = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // 4. Create Stores table
+    // Create Stores table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS stores (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -64,7 +87,7 @@ const initDatabase = async () => {
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     `);
 
-    // 5. Create Ratings table
+    // Create Ratings table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS ratings (
         id INT AUTO_INCREMENT PRIMARY KEY,
@@ -89,16 +112,7 @@ const initDatabase = async () => {
 
 const getPool = () => {
   if (!pool) {
-    pool = mysql.createPool({
-      host: DB_HOST,
-      port: Number(DB_PORT),
-      user: DB_USER,
-      password: DB_PASSWORD,
-      database: DB_NAME,
-      waitForConnections: true,
-      connectionLimit: 10,
-      queueLimit: 0
-    });
+    pool = mysql.createPool(getPoolConfig());
   }
   return pool;
 };
@@ -107,3 +121,4 @@ module.exports = {
   initDatabase,
   getPool
 };
+

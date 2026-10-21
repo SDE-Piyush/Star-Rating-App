@@ -22,9 +22,34 @@ app.use('/api/admin', adminRoutes);
 app.use('/api/stores', storeRoutes);
 app.use('/api/owner', ownerRoutes);
 
+const { seedData } = require('./scripts/seed');
+
 // Health check endpoint
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// Database seed endpoint for easy cloud deployment setup
+app.get('/api/seed', async (req, res) => {
+  const secret = req.query.secret || req.headers['x-seed-secret'];
+  const expectedSecret = process.env.SEED_SECRET || 'Piyush@121';
+  if (secret !== expectedSecret) {
+    return res.status(403).json({ 
+      error: 'Unauthorized', 
+      message: 'Please provide the correct secret key parameter: /api/seed?secret=YOUR_SECRET' 
+    });
+  }
+
+  try {
+    await seedData(false);
+    res.status(200).json({ 
+      status: 'success', 
+      message: 'Database seeded successfully with demo accounts (Admin, Store Owners, Normal Users), sample stores, and ratings!' 
+    });
+  } catch (err) {
+    console.error('Seed endpoint error:', err);
+    res.status(500).json({ error: 'Seed failed', details: err.message });
+  }
 });
 
 // Global error handler
@@ -46,4 +71,9 @@ const startServer = async () => {
   }
 };
 
-startServer();
+if (require.main === module || !process.env.VERCEL) {
+  startServer();
+}
+
+module.exports = app;
+

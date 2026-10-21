@@ -1,7 +1,7 @@
 const bcrypt = require('bcryptjs');
 const { initDatabase, getPool } = require('../config/db');
 
-const seedData = async () => {
+const seedData = async (shouldExit = true) => {
   try {
     console.log('Connecting to database and verifying schema...');
     await initDatabase();
@@ -152,11 +152,21 @@ const seedData = async () => {
     console.log('Normal User: user3@gmail.com             | Password: Piyush@121 | Name: Adya         | Address: Delhi');
     console.log('-----------------------------\n');
 
-    process.exit(0);
+    if (shouldExit) {
+      process.exit(0);
+    }
+    return { success: true };
   } catch (err) {
     console.error('Seeding failed:', err);
-    process.exit(1);
+    if (shouldExit) {
+      process.exit(1);
+    }
+    throw err;
   }
 };
 
-seedData();
+if (require.main === module) {
+  seedData(true);
+}
+
+module.exports = { seedData };

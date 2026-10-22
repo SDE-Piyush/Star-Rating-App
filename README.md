@@ -9,7 +9,7 @@ A full-stack web platform built with React.js, Express.js, and MySQL that enable
   - **Node.js & Express.js** 
 
 - **Database**:
-  - **MySQL 8.0** 
+  - **MySQL** 
 
 ---
 

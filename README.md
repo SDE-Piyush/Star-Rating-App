@@ -29,4 +29,4 @@ A full-stack web platform built with React.js, Express.js, and MySQL that enable
 6\. Normal User 3 ID: `user3@gmail.com` Password: `Piyush@121`
 
 
-## Hosted Link :  https://star-rating-app-w2hy-pied.vercel.app/login 
+## Hosted Link :  https://star-rating-app-two.vercel.app/login
